@@ -1,0 +1,56 @@
+#%%
+# Import dependencies
+import os
+import praw
+import pandas as pd
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Get credentials from .env file
+client_id=os.getenv('client_id')
+client_secret=os.getenv('client_secret')
+user_agent=os.getenv('user_agent')
+# %%
+# Instantiate
+
+reddit = praw.Reddit(client_id=client_id,
+client_secret=client_secret,
+user_agent=user_agent)
+
+# %%
+subreddit = reddit.subreddit('Wallstreetbets')
+
+posts=[]
+gme_counter=0
+yolo_counter=0
+moon_counter=0
+
+for submission in subreddit.new(limit=50):
+    print(f'Title: {submission.title}')
+    print(f'Ratio: {submission.upvote_ratio}, Score: {submission.score}, Comments: {submission.num_comments}')
+    print('')
+
+    if 'GME' in submission.title.upper():
+        gme_counter += 1
+    elif 'YOLO' in submission.title.upper():
+        yolo_counter += 1
+    elif 'MOON' in submission.title.upper():
+        moon_counter += 1
+        
+
+print('How often were specific keywords used?')
+print(f'GME: {gme_counter}')
+print(f'YOLO: {yolo_counter}')
+print(f'MOON: {moon_counter}')
+# %%
+
+
+
+=====================
+==== .env file ======
+=====================
+
+client_id='xJiSgjBSQ1oLI_rNgLYqbg'
+client_secret='RsTSnChauwLQz9L8EvxaYeiJ24h7Ew'
+user_agent='/u/Raybawn testAPI'
