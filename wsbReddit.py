@@ -2,11 +2,19 @@
 import os
 import pathlib
 import praw
-import csv
-
+import sqlite3
 import pandas as pd
+import re
+import emoji
+import matplotlib.pyplot as plt
+import seaborn as sns
+from collections import Counter
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
 from dotenv import load_dotenv
+from sqlalchemy import create_engine
 
+### API Connection
 load_dotenv()
 
 # Get credentials from .env file
@@ -19,52 +27,86 @@ reddit = praw.Reddit(client_id=client_id, client_secret=client_secret, user_agen
 subreddit = reddit.subreddit("Wallstreetbets")
 
 
-# Set path for CSV File
-csv_filename = "wsbReddit.csv"
-csv_path = "Reddit Project/CSV/" + csv_filename
-csv_exists = os.path.exists(csv_path)
-
-
-# Set post limit
-postLimit = 1000
+### Set different variables
+postLimit = 100
 posts = []
+words = []
+tablename = "wallstreetbets_tbl"
+listOfTables = []
+dbName = "Reddit.sqlite3"
 
+### Add Posts to list and tokenize submission titles
 for submission in subreddit.new(limit=postLimit):
-    print(f"Title: {submission.title}")
-    print(f"Ratio: {submission.upvote_ratio}, Score: {submission.score}, Comments: {submission.num_comments}")
-    print("")
+    posts.append(
+        [submission.title, submission.upvote_ratio, submission.score, submission.num_comments, submission.created_utc]
+    )
+    post_words = list(
+        set(word_tokenize(submission.title.lower().replace("'", "")))
+    )  # create list with unique words from submission title
+    words.extend(post_words)
 
-    posts.append([submission.title, submission.upvote_ratio, submission.score, submission.num_comments])
+    # print(f"Title: {submission.title}")
+    # print(f"Ratio: {submission.upvote_ratio}, Score: {submission.score}, Comments: {submission.num_comments}")
+    # print("")
+
+# Set different filters
+stop_words = set(stopwords.words("english"))  # Filter out stopwords
+nonPunct = re.compile(".*[A-Za-z0-9].*")  # Filter out words without alphanumeric characters
+
+# Function to filter out emoji characters
+def remove_emoji(string):
+    return emoji.get_emoji_regexp().sub("", string)
 
 
-allPosts = pd.DataFrame(posts, columns=["Title", "Upvote Ratio", "Score", "Number of comments"])
-allPosts.to_csv(csv_path, mode="w")
-print("All posts are added to the CSV file...")
+# Filter stopwords and special characters out
+filtered_words = []
+filtered_words = [remove_emoji(w) for w in words if not w in stop_words and nonPunct.match(w)]
 
+filtered_list_df = pd.DataFrame([Counter(filtered_words)]).transpose()
+words_df = filtered_list_df
+words_df.columns = ["count"]
+words_df.sort_values(by="count", inplace=True, ascending=False)
+top_words = words_df.head(10)
+print(top_words)
 
-# _____Coinmarketcap API_____
-# This example uses Python 2.7 and the python-request library.
-"""
-from requests import Request, Session
-from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
-import json
+# Visualization with seaborn
+# sns.set_theme(style="white", palette="pastel")
+# ax = sns.barplot(data=top_words)
+# plt.show()
 
-cmcAPIkey = os.getenv("cmcAPI")
-
-url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest"
-parameters = {"start": "1", "limit": "100", "convert": "USD"}
-headers = {
-    "Accepts": "application/json",
-    "X-CMC_PRO_API_KEY": "0bb654bb-5bf0-4fba-898b-e45b14f31713",
-}
-
-session = Session()
-session.headers.update(headers)
-
+'''
+### SQLite Handling
 try:
-    response = session.get(url, params=parameters)
-    data = json.loads(response.text)
-    print(data)
-except (ConnectionError, Timeout, TooManyRedirects) as e:
-    print(e)
-"""
+    sqliteConnection = sqlite3.connect(dbName)
+    sqlite_create_table_query = f"""CREATE TABLE IF NOT EXISTS {tablename} (
+        index INT PRIMARY KEY NOT NULL,
+        title TEXT NOT NULL,
+        upvote_ratio FLOAT NOT NULL,
+        score INTEGER NOT NULL,
+        number_of_comments INTEGER NOT NULL,
+        created FLOAT NOT NULL
+        );"""
+
+    cursor = sqliteConnection.cursor()
+    print("Successfully connected to SQLite")
+
+    cursor.execute(sqlite_create_table_query)
+    sqliteConnection.commit()
+    print("SQLite table created")
+
+    cursor.close()
+
+except sqlite3.Error as error:
+    print("Error while creating a sqlite table", error)
+finally:
+    if sqliteConnection:
+        sqliteConnection.close()
+        print("SQLite connection is closed")
+
+### Create DataFrame with posts
+allPosts = pd.DataFrame(posts, columns=["title", "upvote_ratio", "score", "number_of_comments", "created"])
+
+### Add DataFrame to SQL Database
+engine = create_engine("sqlite:///" + dbName, echo=False,)
+allPosts.to_sql(tablename, con=engine, if_exists="replace")
+'''
