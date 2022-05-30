@@ -1,2 +1,8 @@
 /.env
 /.vscode
+/.pytest_cache
+/code.txt
+/cryptoList.json
+/Reddit.sqlite3
+/CSV
+/.gitignore
