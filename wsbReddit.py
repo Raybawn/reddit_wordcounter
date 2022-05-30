@@ -1,3 +1,4 @@
+#%%
 # Import dependencies
 import os
 import pathlib
@@ -14,7 +15,7 @@ from nltk.corpus import stopwords
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 
-### API Connection
+# API Connection
 load_dotenv()
 
 # Get credentials from .env file
@@ -27,7 +28,7 @@ reddit = praw.Reddit(client_id=client_id, client_secret=client_secret, user_agen
 subreddit = reddit.subreddit("Wallstreetbets")
 
 
-### Set different variables
+# Set different variables
 postLimit = 100
 posts = []
 words = []
@@ -35,7 +36,7 @@ tablename = "wallstreetbets_tbl"
 listOfTables = []
 dbName = "Reddit.sqlite3"
 
-### Add Posts to list and tokenize submission titles
+# Add Posts to list and tokenize submission titles
 for submission in subreddit.new(limit=postLimit):
     posts.append(
         [submission.title, submission.upvote_ratio, submission.score, submission.num_comments, submission.created_utc]
@@ -59,23 +60,18 @@ def remove_emoji(string):
 
 
 # Filter stopwords and special characters out
-filtered_words = []
 filtered_words = [remove_emoji(w) for w in words if not w in stop_words and nonPunct.match(w)]
 
-filtered_list_df = pd.DataFrame([Counter(filtered_words)]).transpose()
-words_df = filtered_list_df
-words_df.columns = ["count"]
-words_df.sort_values(by="count", inplace=True, ascending=False)
-top_words = words_df.head(10)
-print(top_words)
+filtered_list_df = pd.DataFrame(filtered_words).stack().value_counts().reset_index(name="count")
+filtered_list_df.columns = ["word", "count"]
+print(filtered_list_df.head(10))
 
 # Visualization with seaborn
-# sns.set_theme(style="white", palette="pastel")
-# ax = sns.barplot(data=top_words)
-# plt.show()
+sns.barplot(data=filtered_list_df.head(10), x="word", y="count")
+plt.show()
 
 '''
-### SQLite Handling
+# SQLite Handling
 try:
     sqliteConnection = sqlite3.connect(dbName)
     sqlite_create_table_query = f"""CREATE TABLE IF NOT EXISTS {tablename} (
@@ -103,10 +99,10 @@ finally:
         sqliteConnection.close()
         print("SQLite connection is closed")
 
-### Create DataFrame with posts
+# Create DataFrame with posts
 allPosts = pd.DataFrame(posts, columns=["title", "upvote_ratio", "score", "number_of_comments", "created"])
 
-### Add DataFrame to SQL Database
+# Add DataFrame to SQL Database
 engine = create_engine("sqlite:///" + dbName, echo=False,)
 allPosts.to_sql(tablename, con=engine, if_exists="replace")
 '''
